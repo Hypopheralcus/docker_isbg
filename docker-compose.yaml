@@ -11,5 +11,5 @@ services:
       DETAILED_LOGGING: "false"
       LIST_FOLDERS: "false"
     volumes:
-      - ./spamassassinVol:/var/lib/spamassassin
-      - ./accounts:/var/lib/mailaccounts:ro
+      - spamassassinVol:/var/lib/spamassassin
+      - accounts:/var/lib/mailaccounts:ro

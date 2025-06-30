@@ -1,6 +1,6 @@
 services:
   docker_isbg:
-    image: user4711/isbg:latest
+    image: hypopheralcus/isbg:latest
     environment:
       TZ: Europe/Berlin
       CRON_HOUR: 1

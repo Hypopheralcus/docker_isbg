@@ -16,4 +16,6 @@ services:
 
 volumes:
   spamassassinVol:
+    external: true
   accounts:
+    external: true

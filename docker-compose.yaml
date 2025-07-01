@@ -8,8 +8,8 @@ services:
       HAM_BATCH_SIZE: 50
       SPAM_BATCH_SIZE: 200
       FILTER_BATCH_SIZE: 50
-      DETAILED_LOGGING: "false"
-      LIST_FOLDERS: "false"
+      DETAILED_LOGGING: "true"
+      LIST_FOLDERS: "true"
     volumes:
       - spamassassinVol:/var/lib/spamassassin
       - accounts:/var/lib/mailaccounts:ro

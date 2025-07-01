@@ -13,3 +13,7 @@ services:
     volumes:
       - spamassassinVol:/var/lib/spamassassin
       - accounts:/var/lib/mailaccounts:ro
+
+volumes:
+  spamassassinVol:
+  accounts:

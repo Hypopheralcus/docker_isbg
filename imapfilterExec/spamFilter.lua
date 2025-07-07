@@ -7,65 +7,52 @@ print ( "Spam Filter found " ..#conftab .." Config Files!" )
 for i, confFile in ipairs( conftab ) do
     print( "Handling config file " ..i .. " - " .. confFile )
     
-    -- Überprüfe ob die Datei existiert
+    -- Fehlerbehandlung für Dateizugriff
     local file = io.open(confFile, "r")
-    if file then
-        print( "✓ Config file exists and is readable: " .. confFile )
-        file:close()
-    else
-        print( "✗ ERROR: Config file not found or not readable: " .. confFile )
+    if not file then
+        print( "✗ ERROR: Config file not found: " .. confFile )
         goto continue
     end
+    file:close()
+    print( "✓ Config file exists: " .. confFile )
     
-    -- Lade die Konfiguration mit Fehlerbehandlung
-    local config = nil
-    local success, err = pcall(function()
-        config = confLoader.readConf( confFile )
-    end)
-    
-    if not success then
-        print( "✗ ERROR reading config file " .. confFile .. ": " .. tostring(err) )
-        goto continue
-    end
-    
-    if config == nil then
-        print( "✗ ERROR: Config is nil for file: " .. confFile )
-        goto continue
-    end
-    
-    print( "✓ Config loaded successfully for file: " .. confFile )
-    
-    -- Prüfe spamHandling
-    local spamHandlingEnabled = true
-    if confLoader.tableHasKey( config, "spamHandling" ) then
-        spamHandlingEnabled = (config.spamHandling == "yes")
-        print( "   spamHandling setting: " .. tostring(config.spamHandling) )
-    else
-        print( "   spamHandling not specified, defaulting to 'yes'" )
-    end
-    
-    if spamHandlingEnabled then
-        print( "✓ Spam handling enabled for config: " .. confFile )
+    -- Scope-Problem lösen: Alles in einen do-Block
+    do
+        local config = nil
+        local success, err = pcall(function()
+            config = confLoader.readConf( confFile )
+        end)
         
-        -- Prüfe erforderliche Konfigurationsparameter
-        if not config.server then
-            print( "✗ ERROR: Missing server configuration in: " .. confFile )
-            goto continue
+        if not success then
+            print( "✗ ERROR reading config: " .. tostring(err) )
+            break -- Verlasse den do-Block, dann goto continue
         end
-        if not config.username then
-            print( "✗ ERROR: Missing username configuration in: " .. confFile )
-            goto continue
+        
+        if config == nil then
+            print( "✗ ERROR: Config is nil" )
+            break
         end
-        if not config.password then
-            print( "✗ ERROR: Missing password configuration in: " .. confFile )
-            goto continue
+        
+        print( "✓ Config loaded successfully" )
+        
+        -- Prüfe spamHandling
+        if confLoader.tableHasKey( config, "spamHandling" ) and config.spamHandling ~= "yes" then
+            print( "   Spam handling disabled" )
+            break
+        end
+        
+        print( "✓ Spam handling enabled" )
+        
+        -- Validiere erforderliche Parameter
+        if not config.server or not config.username or not config.password then
+            print( "✗ ERROR: Missing required config parameters" )
+            break
         end
         
         print( "   Server: " .. config.server )
         print( "   Username: " .. config.username )
-        print( "   Password: [HIDDEN]" )
         
-        -- IMAP-Verbindung mit Fehlerbehandlung
+        -- IMAP-Verbindung
         local imapObj = nil
         success, err = pcall(function()
             imapObj = IMAP {
@@ -78,12 +65,12 @@ for i, confFile in ipairs( conftab ) do
         
         if not success then
             print( "✗ ERROR creating IMAP connection: " .. tostring(err) )
-            goto continue
+            break
         end
         
         print( "✓ IMAP connection established" )
         
-        -- Umgebungsvariablen prüfen
+        -- Umgebungsvariablen
         local verboseOption = ""
         if os.getenv( "DETAILED_LOGGING" ) == "true" then 
             verboseOption = " --verbose"
@@ -104,7 +91,7 @@ for i, confFile in ipairs( conftab ) do
         
         -- Spam-Subject-Handling
         if confLoader.tableHasKey( config, "spamSubject" ) then
-            print( "   Processing spam subject filter: " .. config.spamSubject )
+            print( "   Processing spam subject: " .. config.spamSubject )
             
             local spamMessages = nil
             success, err = pcall(function()
@@ -112,25 +99,23 @@ for i, confFile in ipairs( conftab ) do
             end)
             
             if not success then
-                print( "✗ ERROR filtering spam messages: " .. tostring(err) )
-                goto continue
+                print( "✗ ERROR filtering spam: " .. tostring(err) )
+                break
             end
             
             if spamMessages and #spamMessages > 0 then
-                print( "   Found " .. #spamMessages .. " spam messages to move" )
-                
                 success, err = pcall(function()
                     imapObj[config.folders.inbox]:move_messages( imapObj[config.folders.spam], spamMessages )
                 end)
                 
                 if not success then
-                    print( "✗ ERROR moving spam messages: " .. tostring(err) )
-                    goto continue
+                    print( "✗ ERROR moving spam: " .. tostring(err) )
+                    break
                 end
                 
                 print( "✓ Moved " .. #spamMessages .. " spam messages" )
             else
-                print( "   0 spam messages found to move" )
+                print( "   0 spam messages found" )
             end
         end
         
@@ -139,11 +124,9 @@ for i, confFile in ipairs( conftab ) do
         if confLoader.tableHasKey( config, "report" ) and config.report == "yes" then
             report = ""
             print( "   Report enabled" )
-        else
-            print( "   Report disabled" )
         end
         
-        -- Kommando zusammenbauen
+        -- Kommando ausführen
         local command = "su -c \"" .. settings.isbgPath .. 
                        " --imaphost " .. config.server .. 
                        " --spamc --imapuser " .. config.username .. 
@@ -159,26 +142,22 @@ for i, confFile in ipairs( conftab ) do
             print( "   Command: " .. command )
         end
         
-        print( "   Executing spam filter command..." )
-        
-        -- Kommando ausführen mit Fehlerbehandlung
+        print( "   Executing spam filter..." )
         success, err = pcall(function()
             os.execute( command )
         end)
         
         if not success then
             print( "✗ ERROR executing command: " .. tostring(err) )
-            goto continue
+            break
         end
         
         print( "✓ Command executed successfully" )
         
-    else
-        print( "   Spam handling disabled for config: " .. confFile )
-    end
+    end -- Ende des do-Blocks
     
     ::continue::
-    print( "Completed processing config file " .. i .. " - " .. confFile )
+    print( "Completed processing: " .. confFile )
     print( "----------------------------------------" )
 end
 
